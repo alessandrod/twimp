@@ -314,8 +314,19 @@ class ClientStream(object):
         sm(0, chunks.PROTO_SET_CHUNK_SIZE, 0, vb(_s_ulong.pack(new_size)))
         self.protocol.muxer.set_chunk_size(new_size)
 
-    def play(self, receiver):
-        raise NotImplementedError()
+    def play(self, name, receiver):
+        if self._state is not None:
+            raise InvalidStreamState('requested play in state %r' %
+                                     (self._state,))
+        self._state = STREAM_STATE_PLAYING
+
+        d = self.protocol.waitStatus(self.id, 'NetStream.Play.Reset')
+        d.addCallback(lambda *args: self.protocol.waitStatus(self.id,
+            'NetStream.Play.Start'))
+        self.protocol.signalRemote(self.id, 'play', None, name)
+
+        return d
+
 
     def _failed_unpublishing(self, failure):
         log.info('failed unpublishing - Huh?!')
